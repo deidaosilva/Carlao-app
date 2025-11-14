@@ -1,0 +1,451 @@
+
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Carlão Lanches — Pedidos Online</title>
+<style>
+:root{--brand:#d9534f;--bg:#faf3e8;--card:#fff;--muted:#666;--maxw:1100px}
+*{box-sizing:border-box}
+body{font-family:Arial,Helvetica,sans-serif;margin:0;background:var(--bg);color:#222}
+header{background:var(--brand);color:#fff;padding:14px 0}
+.wrap{max-width:var(--maxw);margin:18px auto;padding:0 16px}
+.grid{display:grid;grid-template-columns:1fr 380px;gap:18px}
+@media(max-width:920px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border-radius:10px;padding:14px;box-shadow:0 4px 18px rgba(0,0,0,0.06)}
+.item{display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;border-top:1px solid #f0f0f0}
+.left{flex:1}
+.controls{display:flex;gap:8px;align-items:center;margin-top:8px}
+button.small{padding:6px 8px;border-radius:8px;border:1px solid #ddd;background:#fff;cursor:pointer}
+.add{background:var(--brand);color:#fff;border:0;padding:8px 12px;border-radius:8px;cursor:pointer}
+aside.cart{position:sticky;top:18px}
+.line{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px dashed #eee}
+.totals{font-weight:800;font-size:18px;margin-top:6px}
+.form-row{margin-top:10px}
+input[type="text"], input[type="tel"], textarea, select {width:100%;padding:8px;border-radius:8px;border:1px solid #e0e0e0}
+.small{font-size:13px;color:var(--muted)}
+.actions{display:flex;gap:8px;margin-top:10px}
+.btn{flex:1;padding:10px;border-radius:8px;border:0;cursor:pointer}
+.btn-primary{background:var(--brand);color:#fff}
+.btn-secondary{background:#fff;border:1px solid #ddd}
+.note{font-size:13px;color:var(--muted);margin-top:8px}
+.options-panel{background:#fff;border:1px solid #eee;padding:10px;border-radius:8px;margin-top:8px}
+.opt-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+.opt-grid label{display:flex;align-items:center;gap:8px}
+.cart-item{padding:8px 0;border-bottom:1px solid #f0f0f0}
+.badge{font-size:12px;color:#fff;background:var(--brand);padding:4px 8px;border-radius:999px}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>Carlão Lanches — Pedidos Online</h1>
+  </div>
+</header>
+
+<main class="wrap grid">
+  <div class="card" id="menuCard">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <h2>Cardápio</h2>
+      <div class="small">Horário: <span id="openHoursLabel">Seg-Seg 18:30–23:45</span></div>
+    </div>
+
+    <div class="section">
+      <div class="note"><strong>Todos os lanches acompanham:</strong> molho, milho, ervilha, maionese, catchup, mostarda, alface, queijo, ovo.</div>
+      <div class="small" style="margin-top:6px">Para excluir algum acompanhamento abra <em>Opções</em> do item e desmarque o que quiser.</div>
+    </div>
+
+    <div id="menuSections"></div>
+  </div>
+
+  <aside class="card cart" id="cartCard">
+    <h2>Meu Pedido <span id="cartCount" class="badge" style="display:none">0</span></h2>
+    <div id="cartList" style="min-height:120px"></div>
+
+    <div class="form-row">
+      <label class="small">Nome</label>
+      <input type="text" id="customerName" placeholder="Ex: João" />
+    </div>
+
+    <div class="form-row">
+      <label class="small">Telefone</label>
+      <input type="tel" id="customerPhone" placeholder="+55 51 9xxxx-xxxx" />
+    </div>
+
+    <div class="form-row">
+      <label class="small">Retirada / Tele</label>
+      <select id="deliveryType">
+        <option value="pickup">Retirar no local</option>
+        <option value="delivery">Tele (R$ 10,00)</option>
+      </select>
+    </div>
+
+    <div class="form-row">
+      <label class="small">Observações</label>
+      <textarea id="orderNote" rows="2" placeholder="Ex: sem cebola..."></textarea>
+    </div>
+
+    <div class="line">
+      <div>Tempo de espera estimado</div>
+      <div id="waitEstimateLabel">—</div>
+    </div>
+
+    <div class="line">
+      <div>Sub-total</div>
+      <div id="subTotalLabel">R$ 0,00</div>
+    </div>
+    <div class="line">
+      <div>Taxa entrega</div>
+      <div id="deliveryFeeLabel">R$ 0,00</div>
+    </div>
+    <div class="totals">
+      <div style="display:flex;justify-content:space-between">
+        <div>Total</div>
+        <div id="totalLabel">R$ 0,00</div>
+      </div>
+    </div>
+
+    <div class="actions" style="margin-top:12px">
+      <button class="btn btn-secondary" id="printTicket" onclick="window.print()">Imprimir bilhete</button>
+      <button class="btn btn-primary" id="sendWhatsapp">Confirmar e Enviar WhatsApp</button>
+    </div>
+
+    <div class="note" style="margin-top:8px">Pedidos serão enviados para o WhatsApp: <strong>+55 51 3722-5848</strong>.</div>
+    <div class="note">A lancheria recebe automaticamente cópia do pedido no servidor interno para impressão pela equipe.</div>
+  </aside>
+</main>
+
+<script>
+// ---------- CONFIG ----------
+const WHATSAPP_NUMBER = "55137225848"; // Use sem + ou espaços: 55<DDD><numero>
+const PRINTER_SERVER_URL = "http://localhost:3000/api/orders"; // mudar se necessário
+const PRINTER_SERVER_API_KEY = "REPLACE_WITH_STRONG_KEY";
+const DELIVERY_FEE = 10.00;
+const defaultAccomp = ["Molho","Milho","Ervilha","Maionese","Catchup","Mostarda","Alface","Queijo","Ovo"];
+
+// ---------- MENU (extraído das imagens) ----------
+const menu = {
+  restaurant: "Carlão Lanches",
+  currency: "R$",
+  sections: [
+    { id: "xis", title: "Xis", items: [
+      { id:"xis_salada", name:"Xis Salada", price:26.00 },
+      { id:"xis_frango", name:"Xis Frango", price:24.00 },
+      { id:"xis_frango_carne", name:"Xis Frango com Carne", price:33.00 },
+      { id:"xis_calabresa", name:"Xis Calabresa", price:35.00 },
+      { id:"xis_calabresa_sem", name:"Xis Calabresa (Sem Carne)", price:27.00 },
+      { id:"xis_bacon", name:"Xis Bacon", price:38.00 },
+      { id:"xis_bacon_sem", name:"Xis Bacon (Sem Carne)", price:29.00 },
+      { id:"xis_coracao", name:"Xis Coração", price:38.00 },
+      { id:"xis_file", name:"Xis Filé", price:45.00 },
+      { id:"xis_frango_cat", name:"Xis Frango Catupiry", price:27.00 },
+      { id:"xis_strog_frango", name:"Xis Strogonoff de Frango", price:28.00 },
+      { id:"xis_frango_bbq", name:"Xis Frango ao Molho Barbecue", price:28.00 },
+      { id:"xis_bacon_abacaxi", name:"Xis Bacon com Abacaxi", price:42.00 },
+      { id:"xis_bacon_abacaxi_sem", name:"Xis Bacon c/ Abacaxi (Sem Carne)", price:35.00 },
+      { id:"xis_strog_file", name:"Xis Strogonoff de Filé", price:47.00 },
+      { id:"xis_veget", name:"Xis Vegetariano", price:19.00 }
+    ]},
+    { id:"mini_xis", title:"Mini Xis", items: [
+      { id:"mini_salada", name:"Mini Xis Salada", price:25.00 },
+      { id:"mini_frango", name:"Mini Xis Frango", price:23.00 },
+      { id:"mini_frango_carne", name:"Mini Xis Frango com Carne", price:29.00 },
+      { id:"mini_calabresa", name:"Mini Xis Calabresa", price:34.00 },
+      { id:"mini_calabresa_sem", name:"Mini Xis Calabresa (Sem Carne)", price:26.00 },
+      { id:"mini_bacon", name:"Mini Xis Bacon", price:37.00 },
+      { id:"mini_bacon_sem", name:"Mini Xis Bacon (Sem Carne)", price:28.00 },
+      { id:"mini_coracao", name:"Mini Xis Coração", price:37.00 },
+      { id:"mini_file", name:"Mini Xis Filé", price:44.00 },
+      { id:"mini_frango_cat", name:"Mini Xis Frango Catupiry", price:25.00 },
+      { id:"mini_strog_frango", name:"Mini Xis Strogonoff de Frango", price:27.00 },
+      { id:"mini_frango_bbq", name:"Mini Xis Frango ao Molho Barbecue", price:27.00 },
+      { id:"mini_bacon_abacaxi", name:"Mini Xis Bacon com Abacaxi", price:41.00 },
+      { id:"mini_bacon_abacaxi_sem", name:"Mini Xis Bacon c/ Abacaxi (Sem Carne)", price:34.00 },
+      { id:"mini_strog_file", name:"Mini Xis Strogonoff de Filé", price:46.00 },
+      { id:"mini_veget", name:"Mini Xis Vegetariano", price:17.00 }
+    ]},
+    { id:"torrada", title:"Torrada", items:[
+      {id:"torrada_simples", name:"Torrada Simples", price:9.00},
+      {id:"torrada_carne", name:"Torrada de Carne", price:23.00},
+      {id:"torrada_calabresa", name:"Torrada Calabresa", price:31.00},
+      {id:"torrada_calabresa_sem", name:"Torrada Calabresa (Sem Carne)", price:24.00},
+      {id:"torrada_file", name:"Torrada Filé", price:40.00},
+      {id:"torrada_ovo", name:"Torrada com Ovo", price:12.00},
+      {id:"torrada_frango", name:"Torrada de Frango", price:22.00},
+      {id:"torrada_coracao", name:"Torrada de Coração", price:34.00},
+      {id:"torrada_bacon_abacaxi", name:"Torrada Bacon com Abacaxi", price:38.00},
+      {id:"torrada_bacon_abacaxi_sem", name:"Torrada Bacon c/ Abacaxi (Sem Carne)", price:27.00}
+    ]},
+    { id:"cachorro", title:"Cachorro-Quente", items:[
+      {id:"cachorro_simples", name:"Cachorro Simples", price:18.00},
+      {id:"cachorro_2sals", name:"Cachorro 2 Salsichas", price:20.00},
+      {id:"cachorro_calabresa", name:"Cachorro Calabresa", price:25.00},
+      {id:"cachorro_coracao", name:"Cachorro Coração", price:34.00},
+      {id:"cachorro_frango", name:"Cachorro Frango", price:23.00},
+      {id:"cachorro_carne", name:"Cachorro Carne", price:23.00},
+      {id:"cachorro_sals_bacon", name:"Cachorro Salsicha c/ Bacon", price:24.00},
+      {id:"cachorro_file", name:"Cachorro Filé", price:38.00}
+    ]},
+    { id:"porcoes", title:"Porções de Fritas", items:[
+      {id:"porcao_grande", name:"Porção Grande", price:28.00},
+      {id:"porcao_grande_queijo", name:"Porção Grande c/ Queijo", price:32.00},
+      {id:"porcao_grande_tudo", name:"Porção Grande c/ Queijo, Bacon ou Calabresa", price:35.00},
+      {id:"porcao_media", name:"Porção Média", price:25.00},
+      {id:"porcao_media_queijo", name:"Porção Média c/ Queijo", price:28.00},
+      {id:"porcao_media_tudo", name:"Porção Média c/ Queijo, Bacon ou Calabresa", price:33.00}
+    ]},
+    { id:"bebidas", title:"Bebidas", items:[
+      {id:"cerveja_original_600", name:"Original / Budweiser 600ml", price:15.00},
+      {id:"cerveja_stella_600", name:"Stella 600ml", price:15.00},
+      {id:"cerveja_heineken_600", name:"Heineken 600ml", price:17.00},
+      {id:"cerveja_polar_600", name:"Polar 600ml", price:10.00},
+      {id:"cerveja_devassa_litro", name:"Devassa Litro", price:13.00},
+      {id:"ref_coca_2l", name:"Coca 2L", price:17.00},
+      {id:"ref_coca_600", name:"Coca 600ml", price:10.00},
+      {id:"ref_lata", name:"Refrigerante Lata", price:7.00},
+      {id:"agua", name:"Água 500ml", price:4.00}
+    ]}
+  ]
+};
+
+// ---------- App State ----------
+let cart = [];
+
+// ---------- Helpers ----------
+function money(v){ return "R$ " + v.toFixed(2); }
+function findItemById(id){
+  for(const s of menu.sections) for(const it of s.items) if(it.id===id) return it;
+  return null;
+}
+
+// ---------- Render Menu ----------
+function renderMenu(){
+  const out = document.getElementById("menuSections");
+  out.innerHTML = "";
+  menu.sections.forEach(section => {
+    const sec = document.createElement("div");
+    sec.className = "section";
+    sec.innerHTML = `<h3>${section.title}</h3>`;
+    section.items.forEach(it => {
+      const div = document.createElement("div");
+      div.className = "item";
+      div.innerHTML = `
+        <div class="left">
+          <h4>${it.name}</h4>
+          <div class="ingredients small">${it.ingredients ? it.ingredients.join(", ") : ""}</div>
+          <div class="controls">
+            <div class="qty"><button class="small" onclick="changeQty('${it.id}', -1)">-</button><span id="qty_${it.id}">0</span><button class="small" onclick="changeQty('${it.id}', 1)">+</button></div>
+            <button class="small" onclick="openOptions('${it.id}')">Opções</button>
+          </div>
+        </div>
+        <div class="price">${money(it.price)}</div>
+      `;
+      sec.appendChild(div);
+    });
+    out.appendChild(sec);
+  });
+}
+
+function changeQty(id, delta){
+  const it = findItemById(id);
+  if(!it) return;
+  let cartItem = cart.find(c=>c.id===id);
+  if(!cartItem && delta>0){
+    cartItem = { id:it.id, name:it.name, price:it.price, qty:0, exclusions: [], note:"" };
+    // default: keep all accompaniments (exclusions empty)
+    cart.push(cartItem);
+  }
+  if(!cartItem) return;
+  cartItem.qty = Math.max(0, cartItem.qty + delta);
+  if(cartItem.qty===0) cart = cart.filter(c=>c.id!==id);
+  document.getElementById("qty_"+id).innerText = cartItem.qty || 0;
+  renderCart();
+}
+
+function openOptions(id){
+  const it = findItemById(id);
+  if(!it) return;
+  // simple modal using prompt for brevity: show list of accompaniments with current selections
+  const cartItem = cart.find(c=>c.id===id) || {exclusions: []};
+  const keep = defaultAccomp.map(a => ({name:a, keep: !cartItem.exclusions || cartItem.exclusions.indexOf(a)===-1}));
+  const check = keep.map((k,i)=> `${i+1}. ${k.name} [${k.keep? 'x' : ' '}]`).join("\n");
+  const resp = prompt("Marque os números dos acompanhamentos a REMOVER (separados por vírgula)\n\nAcompanhamentos: \n"+keep.map((k,i)=> (i+1)+". "+k.name).join("\n") +"\n\nExemplo: 1,3 para remover Molho e Ervilha", "");
+  if(resp===null) return;
+  const toRemove = resp.split(",").map(s=>parseInt(s.trim())).filter(n=>!isNaN(n) && n>=1 && n<=defaultAccomp.length).map(n=>defaultAccomp[n-1]);
+  if(!cartItem || !cart.find(c=>c.id===id)){
+    // add if not in cart
+    changeQty(id, 1);
+  }
+  const ci = cart.find(c=>c.id===id);
+  ci.exclusions = toRemove;
+  renderCart();
+}
+
+// ---------- Render Cart ----------
+function renderCart(){
+  const list = document.getElementById("cartList");
+  list.innerHTML = "";
+  document.getElementById("cartCount").style.display = cart.length? "inline-block":"none";
+  document.getElementById("cartCount").innerText = cart.reduce((s,i)=> s + i.qty, 0) || 0;
+
+  if(cart.length===0){
+    list.innerHTML = "<div class='small'>Seu carrinho está vazio.</div>";
+  } else {
+    cart.forEach(ci=>{
+      const div = document.createElement("div");
+      div.className = "cart-item";
+      div.innerHTML = `<div style="display:flex;justify-content:space-between"><div><b>${ci.qty}x ${ci.name}</b><div class="small">${ci.exclusions && ci.exclusions.length? "Excluir: "+ci.exclusions.join(", "): ""}</div></div><div>${money(ci.price*ci.qty)}</div></div>
+        <div style="margin-top:6px"><button class="small" onclick="editItemNote('${ci.id}')">Adicionar/Editar obs</button> <button class="small" onclick="removeItem('${ci.id}')">Remover</button></div>
+      `;
+      list.appendChild(div);
+    });
+  }
+  updateTotals();
+}
+
+function editItemNote(id){
+  const ci = cart.find(c=>c.id===id);
+  if(!ci) return;
+  const n = prompt("Observação para esse item:", ci.note || "");
+  if(n===null) return;
+  ci.note = n;
+  renderCart();
+}
+function removeItem(id){
+  cart = cart.filter(c=>c.id!==id);
+  document.getElementById("qty_"+id).innerText = 0;
+  renderCart();
+}
+
+// ---------- Totals / Delivery ----------
+function getSubtotal(){ return cart.reduce((s,i)=> s + i.price * i.qty, 0); }
+function updateTotals(){
+  const subtotal = getSubtotal();
+  const deliveryType = document.getElementById("deliveryType").value;
+  const deliveryFee = deliveryType === "delivery" ? DELIVERY_FEE : 0;
+  document.getElementById("subTotalLabel").innerText = money(subtotal);
+  document.getElementById("deliveryFeeLabel").innerText = money(deliveryFee);
+  document.getElementById("totalLabel").innerText = money(subtotal + deliveryFee);
+  updateWaitEstimateLabel();
+}
+
+// ---------- Open hours ----------
+function isOpenNow(){
+  // Operating hours: every day 18:30 - 23:45
+  const now = new Date();
+  const h = now.getHours(), m = now.getMinutes();
+  const afterOpen = (h > 18) || (h===18 && m>=30);
+  const beforeClose = (h < 23) || (h===23 && m<=45);
+  return afterOpen && beforeClose;
+}
+function updateOpenStatus(){
+  const sendBtn = document.getElementById("sendWhatsapp");
+  if(isOpenNow()){
+    sendBtn.disabled = false;
+    sendBtn.innerText = "Confirmar e Enviar WhatsApp";
+  } else {
+    sendBtn.disabled = true;
+    sendBtn.innerText = "Estamos Fechados";
+  }
+}
+setInterval(updateOpenStatus, 10000);
+updateOpenStatus();
+
+// ---------- Wait estimates ----------
+function getWaitEstimate(deliveryType, when = new Date()){
+  const day = when.getDay(); // 0 Sun .. 6 Sat
+  const isMonThu = day>=1 && day<=4;
+  if(isMonThu){
+    if(deliveryType==="pickup") return {text:"Retirada: 40 min — 1h10", minMinutes:40, maxMinutes:70};
+    return {text:"Tele: 50 min — 1h30", minMinutes:50, maxMinutes:90};
+  } else {
+    if(deliveryType==="pickup") return {text:"Retirada: 1h00 — 1h15", minMinutes:60, maxMinutes:75};
+    return {text:"Tele: 1h00 — 1h50", minMinutes:60, maxMinutes:110};
+  }
+}
+function updateWaitEstimateLabel(){
+  const deliveryType = document.getElementById("deliveryType").value;
+  const info = getWaitEstimate(deliveryType);
+  document.getElementById("waitEstimateLabel").innerText = info.text;
+}
+document.getElementById("deliveryType").addEventListener("change", ()=>{ updateWaitEstimateLabel(); updateTotals(); });
+
+// ---------- Build WhatsApp message ----------
+function buildWhatsAppMessage(order){
+  let msg = `*Pedido — ${order.restaurant}*\n`;
+  msg += `Nome: ${order.customerName}\nTel: ${order.customerPhone}\n\n`;
+  msg += `--- Itens ---\n`;
+  order.items.forEach(it => {
+    msg += `${it.qty}x ${it.name} — R$ ${it.price.toFixed(2)}\n`;
+    if(it.exclusions && it.exclusions.length) msg += `  (Excluir: ${it.exclusions.join(", ")})\n`;
+    if(it.note) msg += `  Obs: ${it.note}\n`;
+  });
+  msg += `\nSub-total: R$ ${order.subtotal.toFixed(2)}\n`;
+  if(order.deliveryFee) msg += `Taxa entrega: R$ ${order.deliveryFee.toFixed(2)}\n`;
+  msg += `*Total: R$ ${order.total.toFixed(2)}*\n\n`;
+  if(order.orderNote) msg += `Observações do pedido: ${order.orderNote}\n\n`;
+  msg += `Tipo: ${order.deliveryType === "delivery" ? "Tele" : "Retirar no local"}\n`;
+  msg += `Tempo estimado: ${order.waitEstimate.text}\n`;
+  msg += `\nObrigado!`;
+  return msg;
+}
+
+// ---------- Build order object ----------
+async function buildOrderObject(){
+  const deliveryType = document.getElementById("deliveryType").value;
+  const subtotal = getSubtotal();
+  const deliveryFee = deliveryType === "delivery" ? DELIVERY_FEE : 0;
+  const waitInfo = getWaitEstimate(deliveryType);
+  const order = {
+    restaurant: menu.restaurant,
+    createdAt: new Date().toISOString(),
+    customerName: document.getElementById("customerName").value || "Cliente",
+    customerPhone: document.getElementById("customerPhone").value || "",
+    deliveryType,
+    deliveryFee,
+    items: cart.map(ci => ({ id:ci.id, name:ci.name, price:ci.price, qty:ci.qty, exclusions:ci.exclusions || [], note:ci.note || "" })),
+    subtotal,
+    total: +(subtotal + deliveryFee).toFixed(2),
+    orderNote: document.getElementById("orderNote").value || "",
+    waitEstimate: waitInfo
+  };
+  document.getElementById("waitEstimateLabel").innerText = waitInfo.text;
+  return order;
+}
+
+// ---------- Send flow ----------
+async function onConfirmSend(){
+  if(!isOpenNow()){
+    alert("Estamos fechados agora. Nosso horário é das 18:30 às 23:45.");
+    return;
+  }
+  if(cart.length===0){ alert("Seu carrinho está vazio."); return; }
+  const order = await buildOrderObject();
+
+  // send to server (silent for client) to store and allow company to print later
+  try{
+    await fetch(PRINTER_SERVER_URL, {
+      method: "POST",
+      headers: {"Content-Type":"application/json", "x-api-key": PRINTER_SERVER_API_KEY},
+      body: JSON.stringify({action:"create_order", order})
+    });
+  }catch(err){
+    console.error("Falha ao enviar pedido ao servidor:", err);
+  }
+
+  // open whatsapp
+  const text = encodeURIComponent(buildWhatsAppMessage(order));
+  const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${text}`;
+  window.open(url, "_blank");
+}
+
+// ---------- Init ----------
+document.getElementById("sendWhatsapp").addEventListener("click", onConfirmSend);
+
+renderMenu();
+renderCart();
+updateWaitEstimateLabel();
+</script>
+</body>
+</html>
